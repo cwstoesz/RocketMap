@@ -387,7 +387,15 @@
 
         // Update map with new location
         function updateMap(location) {
+            console.log('Updating map with location:', location);
+            
+            if (!map) {
+                console.error('Map not initialized!');
+                return;
+            }
+            
             const latlng = [location.latitude, location.longitude];
+            console.log('Map coordinates:', latlng);
             
             // Add to history
             locationHistory.push(latlng);
@@ -410,6 +418,8 @@
                     Time: ${location.timestamp.toLocaleTimeString()}
                 `)
                 .openPopup();
+                
+            console.log('Marker added to map');
 
             // Update path
             if (pathPolyline) {
@@ -422,10 +432,12 @@
                     weight: 3,
                     opacity: 0.8
                 }).addTo(map);
+                console.log('Path updated with', locationHistory.length, 'points');
             }
 
             // Center map on current location
             map.setView(latlng, Math.max(map.getZoom(), 15));
+            console.log('Map view set to:', latlng, 'zoom:', Math.max(map.getZoom(), 15));
         }
 
         // Error handling
