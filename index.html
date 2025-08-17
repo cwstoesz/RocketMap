@@ -249,6 +249,8 @@
                 await characteristic.startNotifications();
                 characteristic.addEventListener('characteristicvaluechanged', handleGPSData);
 
+                // Clear buffer on new connection
+                dataBuffer = '';
                 updateStatus('Ready to receive GPS data', true);
 
                 // Handle disconnection
