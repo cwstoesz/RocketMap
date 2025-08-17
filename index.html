@@ -291,18 +291,22 @@
         function parseGPSData(data) {
             console.log('Parsing GPS data:', JSON.stringify(data));
             
-            const parts = data.split(',').map(part => part.trim());
+            // Clean the data: remove extra whitespace and handle spaces after commas
+            const cleanData = data.replace(/\s*,\s*/g, ',').trim();
+            console.log('Cleaned data:', JSON.stringify(cleanData));
+            
+            const parts = cleanData.split(',');
             console.log('Split parts:', parts);
             
             if (parts.length < 3) {
                 console.log('Invalid GPS data format - not enough parts:', data);
-                showError(`Invalid GPS format: "${data}" (expected: lat,lon,alt)`);
+                showError(`Invalid GPS format: "${data}" (expected: lat, lon, alt)`);
                 return;
             }
 
-            const lat = parseFloat(parts[0]);
-            const lon = parseFloat(parts[1]);
-            const alt = parseFloat(parts[2]);
+            const lat = parseFloat(parts[0].trim());
+            const lon = parseFloat(parts[1].trim());
+            const alt = parseFloat(parts[2].trim());
             
             console.log('Parsed values:', { lat, lon, alt });
 
@@ -311,6 +315,9 @@
                 showError(`Invalid coordinates: lat=${parts[0]}, lon=${parts[1]}, alt=${parts[2]}`);
                 return;
             }
+
+            // Hide error message if parsing succeeds
+            hideError();
 
             const location = {
                 latitude: lat,
