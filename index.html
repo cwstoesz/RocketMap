@@ -322,9 +322,8 @@
             const debugEl = document.getElementById('debugData');
             const trimmed = data.trim();
             debugEl.innerHTML = `
-                <div><strong>Buffer:</strong> "${dataBuffer}" (${dataBuffer.length} chars)</div>
-                <div><strong>Processing:</strong> "${trimmed}" (${trimmed.length} chars)</div>
-                <div>Char codes: [${Array.from(trimmed).map(c => c.charCodeAt(0)).join(', ')}]</div>
+                <div><strong>Processing GPS:</strong> "${trimmed}"</div>
+                <div><strong>Buffer size:</strong> ${dataBuffer.length} chars</div>
             `;
             debugEl.style.display = 'block';
         }
