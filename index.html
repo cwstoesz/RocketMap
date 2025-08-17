@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Tracker - Bluefruit LE</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: white;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff3b30;
+            transition: background 0.3s ease;
+        }
+
+        .status-dot.connected {
+            background: #30d158;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .status-text {
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+
+        .connect-btn {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .connect-btn:hover {
+            background: #0056b3;
+        }
+
+        .connect-btn:disabled {
+            background: #c7c7cc;
+            cursor: not-allowed;
+        }
+
+        .gps-info {
+            background: #f2f2f7;
+            padding: 12px;
+            border-radius: 12px;
+            margin-top: 8px;
+        }
+
+        .coord-row {
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 14px;
+            color: #1d1d1f;
+            margin-bottom: 4px;
+        }
+
+        .alt-row {
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 12px;
+            color: #8e8e93;
+            margin-bottom: 4px;
+        }
+
+        .time-row {
+            font-size: 11px;
+            color: #8e8e93;
+        }
+
+        #map {
+            flex: 1;
+            width: 100%;
+        }
+
+        .waiting-message {
+            color: #8e8e93;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .error-message {
+            color: #ff3b30;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px;
+            }
+            
+            .status-row {
+                flex-wrap: wrap;
+            }
+            
+            .connect-btn {
+                margin-left: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="status-row">
+                <div class="status-dot" id="statusDot"></div>
+                <span class="status-text" id="statusText">Ready to connect</span>
+                <button class="connect-btn" id="connectBtn" onclick="connectToDevice()">Connect</button>
+            </div>
+            
+            <div id="gpsDisplay" class="gps-info" style="display: none;">
+                <div class="coord-row" id="coordinates">📍 Waiting for GPS...</div>
+                <div class="alt-row" id="altitude">🔺 --</div>
+                <div class="time-row" id="timestamp">--</div>
+            </div>
+            
+            <div id="waitingMessage" class="waiting-message">
+                Connect to your Adafruit Bluefruit LE to start tracking
+            </div>
+            
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+        </div>
+        
+        <div id="map"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        // Global variables
+        let device = null;
+        let characteristic = null;
+        let map = null;
+        let currentMarker = null;
+        let pathPolyline = null;
+        let locationHistory = [];
+        let isConnected = false;
+
+        // Adafruit Bluefruit LE UART Service UUIDs
+        const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        const RX_CHARACTERISTIC_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([37.7749, -122.4194], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // Update UI status
+        function updateStatus(text, connected = false) {
+            document.getElementById('statusText').textContent = text;
+            document.getElementById('statusDot').classList.toggle('connected', connected);
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('connectBtn').textContent = connected ? 'Connected' : 'Connect';
+            isConnected = connected;
+            
+            if (connected) {
+                document.getElementById('waitingMessage').style.display = 'none';
+                document.getElementById('gpsDisplay').style.display = 'block';
+            }
+        }
+
+        // Connect to Bluetooth device
+        async function connectToDevice() {
+            try {
+                console.log('Connect button clicked');
+                updateStatus('Scanning for devices...', false);
+                hideError();
+
+                // Request device
+                console.log('Requesting Bluetooth device...');
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [
+                        { namePrefix: 'Adafruit' },
+                        { namePrefix: 'Bluefruit' }
+                    ],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                updateStatus('Connecting...', false);
+
+                // Connect to GATT server
+                const server = await device.gatt.connect();
+                
+                updateStatus('Connected! Getting service...', false);
+
+                // Get service
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                
+                // Get characteristic
+                characteristic = await service.getCharacteristic(RX_CHARACTERISTIC_UUID);
+                
+                // Start notifications
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleGPSData);
+
+                updateStatus('Ready to receive GPS data', true);
+
+                // Handle disconnection
+                device.addEventListener('gattserverdisconnected', () => {
+                    updateStatus('Disconnected', false);
+                    document.getElementById('gpsDisplay').style.display = 'none';
+                    document.getElementById('waitingMessage').style.display = 'block';
+                    document.getElementById('waitingMessage').textContent = 'Device disconnected. Click Connect to reconnect.';
+                });
+
+            } catch (error) {
+                console.error('Connection failed:', error);
+                showError(`Connection failed: ${error.message}`);
+                updateStatus('Connection failed', false);
+            }
+        }
+
+        // Handle incoming GPS data
+        function handleGPSData(event) {
+            const decoder = new TextDecoder();
+            const data = decoder.decode(event.target.value);
+            
+            console.log('Received data:', data);
+            parseGPSData(data.trim());
+        }
+
+        // Parse GPS coordinates
+        function parseGPSData(data) {
+            const parts = data.split(',').map(part => part.trim());
+            
+            if (parts.length < 3) {
+                console.log('Invalid GPS data format:', data);
+                return;
+            }
+
+            const lat = parseFloat(parts[0]);
+            const lon = parseFloat(parts[1]);
+            const alt = parseFloat(parts[2]);
+
+            if (isNaN(lat) || isNaN(lon) || isNaN(alt)) {
+                console.log('Invalid GPS coordinates:', data);
+                return;
+            }
+
+            const location = {
+                latitude: lat,
+                longitude: lon,
+                altitude: alt,
+                timestamp: new Date()
+            };
+
+            updateGPSDisplay(location);
+            updateMap(location);
+        }
+
+        // Update GPS display
+        function updateGPSDisplay(location) {
+            document.getElementById('coordinates').textContent = 
+                `📍 ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
+            
+            document.getElementById('altitude').textContent = 
+                `🔺 ${location.altitude.toFixed(1)}m`;
+            
+            document.getElementById('timestamp').textContent = 
+                `Updated: ${location.timestamp.toLocaleTimeString()}`;
+        }
+
+        // Update map with new location
+        function updateMap(location) {
+            const latlng = [location.latitude, location.longitude];
+            
+            // Add to history
+            locationHistory.push(latlng);
+            if (locationHistory.length > 100) {
+                locationHistory.shift(); // Keep only last 100 points
+            }
+
+            // Update or create marker
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+            
+            currentMarker = L.marker(latlng)
+                .addTo(map)
+                .bindPopup(`
+                    <b>Current Position</b><br>
+                    Lat: ${location.latitude.toFixed(6)}<br>
+                    Lon: ${location.longitude.toFixed(6)}<br>
+                    Alt: ${location.altitude.toFixed(1)}m<br>
+                    Time: ${location.timestamp.toLocaleTimeString()}
+                `)
+                .openPopup();
+
+            // Update path
+            if (pathPolyline) {
+                map.removeLayer(pathPolyline);
+            }
+            
+            if (locationHistory.length > 1) {
+                pathPolyline = L.polyline(locationHistory, {
+                    color: '#007aff',
+                    weight: 3,
+                    opacity: 0.8
+                }).addTo(map);
+            }
+
+            // Center map on current location
+            map.setView(latlng, Math.max(map.getZoom(), 15));
+        }
+
+        // Error handling
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        // Check Web Bluetooth support
+        function checkBluetoothSupport() {
+            const userAgent = navigator.userAgent;
+            const isHTTPS = location.protocol === 'https:';
+            
+            if (!navigator.bluetooth) {
+                showError(`Web Bluetooth not supported. Browser: ${userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Safari') ? 'Safari' : 'Other'}, HTTPS: ${isHTTPS}`);
+                document.getElementById('connectBtn').disabled = true;
+                return false;
+            }
+            
+            if (!isHTTPS && location.hostname !== 'localhost') {
+                showError('Web Bluetooth requires HTTPS. Current protocol: ' + location.protocol);
+                document.getElementById('connectBtn').disabled = true;
+                return false;
+            }
+            
+            // Show debug info
+            console.log('Bluetooth support OK:', {
+                browser: userAgent,
+                https: isHTTPS,
+                hostname: location.hostname
+            });
+            
+            return true;
+        }
+
+        // Initialize app
+        window.addEventListener('load', () => {
+            initMap();
+            checkBluetoothSupport();
+        });
+
+        // Handle page visibility for reconnection
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && device && !device.gatt.connected && isConnected) {
+                // Try to reconnect when page becomes visible
+                setTimeout(() => {
+                    if (!device.gatt.connected) {
+                        updateStatus('Reconnecting...', false);
+                        device.gatt.connect().then(() => {
+                            updateStatus('Reconnected', true);
+                        }).catch(() => {
+                            updateStatus('Reconnection failed', false);
+                        });
+                    }
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>
