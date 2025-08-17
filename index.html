@@ -161,14 +161,14 @@
                 Connect to your Adafruit Bluefruit LE to start tracking
             </div>
             
-            <div id="debugInfo" style="font-size: 11px; color: #666; margin-top: 8px;">
+            <div id="debugInfo" style="font-size: 11px; color: #666; margin-top: 8px; display: none;">
                 <div>Browser: <span id="browserInfo"></span></div>
                 <div>iOS Version: <span id="iosVersion"></span></div>
                 <div>Protocol: <span id="protocolInfo"></span></div>
                 <div>Bluetooth API: <span id="bluetoothAPI"></span></div>
             </div>
             
-            <div id="debugData" style="font-size: 11px; color: #ff3b30; margin-top: 8px; display: none; font-family: monospace; background: #f0f0f0; padding: 4px; border-radius: 4px;"></div>
+            <div id="debugData" style="display: none;"></div>
             
             <div id="errorMessage" class="error-message" style="display: none;"></div>
         </div>
@@ -297,7 +297,6 @@
                 
                 // Create GPS string and process it
                 const gpsString = `${lat}, ${lon}, ${alt}`;
-                showDebugData(gpsString);
                 parseGPSData(gpsString);
                 
                 // Track how much we've processed
