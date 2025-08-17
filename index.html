@@ -283,13 +283,21 @@
         // Show debug data on screen
         function showDebugData(data) {
             const debugEl = document.getElementById('debugData');
-            debugEl.textContent = `Last received: "${data.trim()}"`;
+            const trimmed = data.trim();
+            debugEl.innerHTML = `
+                <div>Raw: "${data}" (${data.length} chars)</div>
+                <div>Trimmed: "${trimmed}" (${trimmed.length} chars)</div>
+                <div>Char codes: [${Array.from(trimmed).map(c => c.charCodeAt(0)).join(', ')}]</div>
+            `;
             debugEl.style.display = 'block';
         }
 
         // Parse GPS coordinates
         function parseGPSData(data) {
-            console.log('Parsing GPS data:', JSON.stringify(data));
+            console.log('=== GPS PARSING DEBUG ===');
+            console.log('Raw data:', JSON.stringify(data));
+            console.log('Data length:', data.length);
+            console.log('Char codes:', Array.from(data).map(c => `'${c}'(${c.charCodeAt(0)})`));
             
             // Clean the data: remove extra whitespace and handle spaces after commas
             const cleanData = data.replace(/\s*,\s*/g, ',').trim();
@@ -297,22 +305,29 @@
             
             const parts = cleanData.split(',');
             console.log('Split parts:', parts);
+            console.log('Parts count:', parts.length);
             
             if (parts.length < 3) {
-                console.log('Invalid GPS data format - not enough parts:', data);
-                showError(`Invalid GPS format: "${data}" (expected: lat, lon, alt)`);
+                const errorMsg = `Invalid GPS format: "${data}" (got ${parts.length} parts, expected 3+)`;
+                console.log('ERROR:', errorMsg);
+                showError(errorMsg);
                 return;
             }
+
+            console.log('Part 0 (lat):', JSON.stringify(parts[0]));
+            console.log('Part 1 (lon):', JSON.stringify(parts[1]));  
+            console.log('Part 2 (alt):', JSON.stringify(parts[2]));
 
             const lat = parseFloat(parts[0].trim());
             const lon = parseFloat(parts[1].trim());
             const alt = parseFloat(parts[2].trim());
             
-            console.log('Parsed values:', { lat, lon, alt });
+            console.log('Parsed floats:', { lat, lon, alt });
 
             if (isNaN(lat) || isNaN(lon) || isNaN(alt)) {
-                console.log('Invalid GPS coordinates - NaN values:', { lat, lon, alt });
-                showError(`Invalid coordinates: lat=${parts[0]}, lon=${parts[1]}, alt=${parts[2]}`);
+                const errorMsg = `Invalid coordinates: lat="${parts[0]}" (${lat}), lon="${parts[1]}" (${lon}), alt="${parts[2]}" (${alt})`;
+                console.log('ERROR:', errorMsg);
+                showError(errorMsg);
                 return;
             }
 
@@ -326,7 +341,7 @@
                 timestamp: new Date()
             };
 
-            console.log('Valid location created:', location);
+            console.log('SUCCESS! Valid location created:', location);
             updateGPSDisplay(location);
             updateMap(location);
         }
