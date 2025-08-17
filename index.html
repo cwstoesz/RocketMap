@@ -277,34 +277,43 @@
             
             // Add to buffer
             dataBuffer += data;
-            console.log('Current buffer:', JSON.stringify(dataBuffer));
+            console.log('Current buffer length:', dataBuffer.length);
             
-            // Check if we have complete message(s) ending with \r\n or \n\r
-            let messages = [];
-            let remaining = dataBuffer;
+            // Look for GPS coordinate patterns (lat, lon, alt format)
+            // Pattern: number, space, number, space, number followed by next number
+            const gpsPattern = /(-?\d+\.\d+),\s*(-?\d+\.\d+),\s*(\d+(?:\.\d+)?)(?=\d|$)/g;
             
-            // Split on various line endings
-            const parts = remaining.split(/\r\n|\n\r|\r|\n/);
+            let match;
+            let processedLength = 0;
             
-            if (parts.length > 1) {
-                // We have at least one complete message
-                messages = parts.slice(0, -1); // All but last part
-                dataBuffer = parts[parts.length - 1]; // Keep last part as incomplete
+            // Find all complete GPS coordinate sets in the buffer
+            while ((match = gpsPattern.exec(dataBuffer)) !== null) {
+                const fullMatch = match[0];
+                const lat = match[1];
+                const lon = match[2];
+                const alt = match[3];
                 
-                console.log('Complete messages found:', messages);
-                console.log('Remaining buffer:', JSON.stringify(dataBuffer));
+                console.log('Found GPS coordinates:', { lat, lon, alt });
                 
-                // Process each complete message
-                messages.forEach(message => {
-                    if (message.trim()) {
-                        showDebugData(message);
-                        parseGPSData(message.trim());
-                    }
-                });
-            } else {
-                // No complete message yet, just show current buffer
-                showDebugData(dataBuffer);
-                console.log('Waiting for complete message...');
+                // Create GPS string and process it
+                const gpsString = `${lat}, ${lon}, ${alt}`;
+                showDebugData(gpsString);
+                parseGPSData(gpsString);
+                
+                // Track how much we've processed
+                processedLength = match.index + fullMatch.length;
+            }
+            
+            // Remove processed data from buffer, keep any incomplete data at the end
+            if (processedLength > 0) {
+                dataBuffer = dataBuffer.substring(processedLength);
+                console.log('Buffer after processing:', JSON.stringify(dataBuffer));
+            }
+            
+            // Keep buffer from growing too large (safety check)
+            if (dataBuffer.length > 2000) {
+                console.log('Buffer too large, clearing...');
+                dataBuffer = dataBuffer.substring(dataBuffer.length - 500);
             }
         }
         
