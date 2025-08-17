@@ -161,6 +161,13 @@
                 Connect to your Adafruit Bluefruit LE to start tracking
             </div>
             
+            <div id="debugInfo" style="font-size: 11px; color: #666; margin-top: 8px;">
+                <div>Browser: <span id="browserInfo"></span></div>
+                <div>iOS Version: <span id="iosVersion"></span></div>
+                <div>Protocol: <span id="protocolInfo"></span></div>
+                <div>Bluetooth API: <span id="bluetoothAPI"></span></div>
+            </div>
+            
             <div id="errorMessage" class="error-message" style="display: none;"></div>
         </div>
         
@@ -390,6 +397,21 @@
         // Initialize app
         window.addEventListener('load', () => {
             initMap();
+            
+            // Show debug info
+            const ua = navigator.userAgent;
+            document.getElementById('browserInfo').textContent = 
+                ua.includes('Chrome') ? 'Chrome' : 
+                ua.includes('Safari') ? 'Safari' : 'Other';
+            
+            document.getElementById('iosVersion').textContent = 
+                ua.match(/OS (\d+_\d+)/)?.[1]?.replace('_', '.') || 'Unknown';
+            
+            document.getElementById('protocolInfo').textContent = location.protocol;
+            
+            document.getElementById('bluetoothAPI').textContent = 
+                navigator.bluetooth ? 'Available' : 'Not Available';
+            
             checkBluetoothSupport();
         });
 
