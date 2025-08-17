@@ -186,6 +186,7 @@
         let pathPolyline = null;
         let locationHistory = [];
         let isConnected = false;
+        let dataBuffer = ''; // Buffer for incomplete data packets
 
         // Adafruit Bluefruit LE UART Service UUIDs
         const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
@@ -270,14 +271,39 @@
             const decoder = new TextDecoder();
             const data = decoder.decode(event.target.value);
             
-            console.log('Raw received data:', JSON.stringify(data));
-            console.log('Data length:', data.length);
-            console.log('Data bytes:', Array.from(event.target.value).map(b => b.toString(16)).join(' '));
+            console.log('Raw packet received:', JSON.stringify(data));
             
-            // Show received data on screen for debugging
-            showDebugData(data);
+            // Add to buffer
+            dataBuffer += data;
+            console.log('Current buffer:', JSON.stringify(dataBuffer));
             
-            parseGPSData(data.trim());
+            // Check if we have complete message(s) ending with \r\n or \n\r
+            let messages = [];
+            let remaining = dataBuffer;
+            
+            // Split on various line endings
+            const parts = remaining.split(/\r\n|\n\r|\r|\n/);
+            
+            if (parts.length > 1) {
+                // We have at least one complete message
+                messages = parts.slice(0, -1); // All but last part
+                dataBuffer = parts[parts.length - 1]; // Keep last part as incomplete
+                
+                console.log('Complete messages found:', messages);
+                console.log('Remaining buffer:', JSON.stringify(dataBuffer));
+                
+                // Process each complete message
+                messages.forEach(message => {
+                    if (message.trim()) {
+                        showDebugData(message);
+                        parseGPSData(message.trim());
+                    }
+                });
+            } else {
+                // No complete message yet, just show current buffer
+                showDebugData(dataBuffer);
+                console.log('Waiting for complete message...');
+            }
         }
         
         // Show debug data on screen
@@ -285,8 +311,8 @@
             const debugEl = document.getElementById('debugData');
             const trimmed = data.trim();
             debugEl.innerHTML = `
-                <div>Raw: "${data}" (${data.length} chars)</div>
-                <div>Trimmed: "${trimmed}" (${trimmed.length} chars)</div>
+                <div><strong>Buffer:</strong> "${dataBuffer}" (${dataBuffer.length} chars)</div>
+                <div><strong>Processing:</strong> "${trimmed}" (${trimmed.length} chars)</div>
                 <div>Char codes: [${Array.from(trimmed).map(c => c.charCodeAt(0)).join(', ')}]</div>
             `;
             debugEl.style.display = 'block';
