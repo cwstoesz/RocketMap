@@ -297,10 +297,9 @@
             console.log('=== GPS PARSING DEBUG ===');
             console.log('Raw data:', JSON.stringify(data));
             console.log('Data length:', data.length);
-            console.log('Char codes:', Array.from(data).map(c => `'${c}'(${c.charCodeAt(0)})`));
             
-            // Clean the data: remove extra whitespace and handle spaces after commas
-            const cleanData = data.replace(/\s*,\s*/g, ',').trim();
+            // Clean the data: remove all whitespace, newlines, carriage returns
+            const cleanData = data.replace(/[\r\n\t\s]*,[\r\n\t\s]*/g, ',').replace(/[\r\n\t]/g, '').trim();
             console.log('Cleaned data:', JSON.stringify(cleanData));
             
             const parts = cleanData.split(',');
