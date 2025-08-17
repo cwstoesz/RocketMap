@@ -168,6 +168,8 @@
                 <div>Bluetooth API: <span id="bluetoothAPI"></span></div>
             </div>
             
+            <div id="debugData" style="font-size: 11px; color: #ff3b30; margin-top: 8px; display: none; font-family: monospace; background: #f0f0f0; padding: 4px; border-radius: 4px;"></div>
+            
             <div id="errorMessage" class="error-message" style="display: none;"></div>
         </div>
         
@@ -268,25 +270,45 @@
             const decoder = new TextDecoder();
             const data = decoder.decode(event.target.value);
             
-            console.log('Received data:', data);
+            console.log('Raw received data:', JSON.stringify(data));
+            console.log('Data length:', data.length);
+            console.log('Data bytes:', Array.from(event.target.value).map(b => b.toString(16)).join(' '));
+            
+            // Show received data on screen for debugging
+            showDebugData(data);
+            
             parseGPSData(data.trim());
+        }
+        
+        // Show debug data on screen
+        function showDebugData(data) {
+            const debugEl = document.getElementById('debugData');
+            debugEl.textContent = `Last received: "${data.trim()}"`;
+            debugEl.style.display = 'block';
         }
 
         // Parse GPS coordinates
         function parseGPSData(data) {
+            console.log('Parsing GPS data:', JSON.stringify(data));
+            
             const parts = data.split(',').map(part => part.trim());
+            console.log('Split parts:', parts);
             
             if (parts.length < 3) {
-                console.log('Invalid GPS data format:', data);
+                console.log('Invalid GPS data format - not enough parts:', data);
+                showError(`Invalid GPS format: "${data}" (expected: lat,lon,alt)`);
                 return;
             }
 
             const lat = parseFloat(parts[0]);
             const lon = parseFloat(parts[1]);
             const alt = parseFloat(parts[2]);
+            
+            console.log('Parsed values:', { lat, lon, alt });
 
             if (isNaN(lat) || isNaN(lon) || isNaN(alt)) {
-                console.log('Invalid GPS coordinates:', data);
+                console.log('Invalid GPS coordinates - NaN values:', { lat, lon, alt });
+                showError(`Invalid coordinates: lat=${parts[0]}, lon=${parts[1]}, alt=${parts[2]}`);
                 return;
             }
 
@@ -297,6 +319,7 @@
                 timestamp: new Date()
             };
 
+            console.log('Valid location created:', location);
             updateGPSDisplay(location);
             updateMap(location);
         }
