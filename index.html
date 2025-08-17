@@ -416,15 +416,7 @@
             }
             
             currentMarker = L.marker(latlng)
-                .addTo(map)
-                .bindPopup(`
-                    <b>Current Position</b><br>
-                    Lat: ${location.latitude.toFixed(6)}<br>
-                    Lon: ${location.longitude.toFixed(6)}<br>
-                    Alt: ${location.altitude.toFixed(1)}m<br>
-                    Time: ${location.timestamp.toLocaleTimeString()}
-                `)
-                .openPopup();
+                .addTo(map);
                 
             console.log('Marker added to map');
 
