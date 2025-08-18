@@ -329,39 +329,30 @@
 
         // Parse GPS coordinates
         function parseGPSData(data) {
-            console.log('=== GPS PARSING DEBUG ===');
-            console.log('Raw data:', JSON.stringify(data));
-            console.log('Data length:', data.length);
-            
             // Clean the data: remove all whitespace, newlines, carriage returns
             const cleanData = data.replace(/[\r\n\t\s]*,[\r\n\t\s]*/g, ',').replace(/[\r\n\t]/g, '').trim();
-            console.log('Cleaned data:', JSON.stringify(cleanData));
             
             const parts = cleanData.split(',');
-            console.log('Split parts:', parts);
-            console.log('Parts count:', parts.length);
             
-            if (parts.length < 3) {
-                const errorMsg = `Invalid GPS format: "${data}" (got ${parts.length} parts, expected 3+)`;
-                console.log('ERROR:', errorMsg);
-                showError(errorMsg);
+            // Validate we have exactly 3 parts
+            if (parts.length !== 3) {
+                console.log('Skipping invalid GPS data - wrong number of parts:', data);
                 return;
             }
-
-            console.log('Part 0 (lat):', JSON.stringify(parts[0]));
-            console.log('Part 1 (lon):', JSON.stringify(parts[1]));  
-            console.log('Part 2 (alt):', JSON.stringify(parts[2]));
 
             const lat = parseFloat(parts[0].trim());
             const lon = parseFloat(parts[1].trim());
             const alt = parseFloat(parts[2].trim());
             
-            console.log('Parsed floats:', { lat, lon, alt });
-
+            // Validate all values are valid numbers
             if (isNaN(lat) || isNaN(lon) || isNaN(alt)) {
-                const errorMsg = `Invalid coordinates: lat="${parts[0]}" (${lat}), lon="${parts[1]}" (${lon}), alt="${parts[2]}" (${alt})`;
-                console.log('ERROR:', errorMsg);
-                showError(errorMsg);
+                console.log('Skipping invalid GPS data - NaN values:', data);
+                return;
+            }
+
+            // Validate coordinate ranges (basic sanity check)
+            if (lat < -90 || lat > 90 || lon < -180 || lon > 180 || alt < -1000 || alt > 50000) {
+                console.log('Skipping invalid GPS data - out of range:', { lat, lon, alt });
                 return;
             }
 
@@ -375,7 +366,6 @@
                 timestamp: new Date()
             };
 
-            console.log('SUCCESS! Valid location created:', location);
             updateGPSDisplay(location);
             updateMap(location);
         }
@@ -386,7 +376,7 @@
                 `📍 ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
             
             document.getElementById('altitude').textContent = 
-                `🔺 ${location.altitude.toFixed(2)}ft`;
+                `🔺 ${location.altitude.toFixed(1)}m`;
             
             document.getElementById('timestamp').textContent = 
                 `Updated: ${location.timestamp.toLocaleTimeString()}`;
@@ -517,7 +507,3 @@
     </script>
 </body>
 </html>
-
-
-
-
