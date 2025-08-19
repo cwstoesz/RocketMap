@@ -439,8 +439,26 @@
             }
 
             // Validate coordinate ranges (basic sanity check)
-            if (lat < -90 || lat > 90 || lon < -180 || lon > 180 || alt < -1000 || alt > 50000) {
-                console.log('Skipping invalid GPS data - out of range:', { lat, lon, alt });
+            if (lat < -90 || lat > 90) {
+                console.log('Skipping invalid GPS data - latitude out of range:', lat);
+                return;
+            }
+            
+            if (lon < -180 || lon > 180) {
+                console.log('Skipping invalid GPS data - longitude out of range:', lon);
+                return;
+            }
+            
+            // Altitude validation: reasonable range for civilian GPS
+            // Dead Sea: -1,412 ft, Mount Everest: ~29,000 ft, plus margin for aircraft
+            if (alt < -2000 || alt > 50000) {
+                console.log('Skipping invalid GPS data - altitude out of range:', alt);
+                return;
+            }
+            
+            // Additional altitude sanity checks
+            if (!isFinite(alt)) {
+                console.log('Skipping invalid GPS data - altitude not finite:', alt);
                 return;
             }
 
@@ -488,12 +506,20 @@
                 locationHistory.shift(); // Keep only last 100 points
             }
 
-            // Update or create marker
+            // Update or create marker with smaller icon
             if (currentMarker) {
                 map.removeLayer(currentMarker);
             }
             
-            currentMarker = L.marker(latlng)
+            // Create smaller custom icon
+            const smallIcon = L.divIcon({
+                html: '<div style="background: #007aff; border: 2px solid white; border-radius: 50%; width: 12px; height: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+                className: 'custom-marker',
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+            
+            currentMarker = L.marker(latlng, { icon: smallIcon })
                 .addTo(map);
                 
             console.log('Marker added to map');
