@@ -417,63 +417,75 @@
 
         // Parse GPS coordinates
         function parseGPSData(data) {
-            // Clean the data: remove all whitespace, newlines, carriage returns
-            const cleanData = data.replace(/[\r\n\t\s]*,[\r\n\t\s]*/g, ',').replace(/[\r\n\t]/g, '').trim();
-            
-            const parts = cleanData.split(',');
-            
-            // Validate we have exactly 3 parts
-            if (parts.length !== 3) {
-                console.log('Skipping invalid GPS data - wrong number of parts:', data);
-                return;
-            }
+            try {
+                // Clean the data: remove all whitespace, newlines, carriage returns
+                const cleanData = data.replace(/[\r\n\t\s]*,[\r\n\t\s]*/g, ',').replace(/[\r\n\t]/g, '').trim();
+                
+                const parts = cleanData.split(',');
+                
+                // Validate we have exactly 3 parts
+                if (parts.length !== 3) {
+                    console.log('Discarding GPS data - wrong number of parts (expected 3, got ' + parts.length + '):', data);
+                    return;
+                }
 
-            const lat = parseFloat(parts[0].trim());
-            const lon = parseFloat(parts[1].trim());
-            const alt = parseFloat(parts[2].trim());
-            
-            // Validate all values are valid numbers
-            if (isNaN(lat) || isNaN(lon) || isNaN(alt)) {
-                console.log('Skipping invalid GPS data - NaN values:', data);
-                return;
-            }
+                // Parse all three values - any failure discards the entire dataset
+                const latStr = parts[0].trim();
+                const lonStr = parts[1].trim();
+                const altStr = parts[2].trim();
+                
+                // Check for empty parts
+                if (!latStr || !lonStr || !altStr) {
+                    console.log('Discarding GPS data - empty values:', { latStr, lonStr, altStr });
+                    return;
+                }
+                
+                const lat = parseFloat(latStr);
+                const lon = parseFloat(lonStr);
+                const alt = parseFloat(altStr);
+                
+                // Validate ALL values are valid finite numbers - any failure discards entire dataset
+                if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(alt)) {
+                    console.log('Discarding entire GPS dataset - invalid numbers:', { lat, lon, alt, original: data });
+                    return;
+                }
+                
+                // Validate coordinate ranges - any failure discards entire dataset
+                if (lat < -90 || lat > 90) {
+                    console.log('Discarding entire GPS dataset - latitude out of range:', lat);
+                    return;
+                }
+                
+                if (lon < -180 || lon > 180) {
+                    console.log('Discarding entire GPS dataset - longitude out of range:', lon);
+                    return;
+                }
+                
+                // Altitude validation - any failure discards entire dataset
+                // Dead Sea: -1,412 ft, Mount Everest: ~29,000 ft, plus margin for aircraft
+                if (alt < -2000 || alt > 50000) {
+                    console.log('Discarding entire GPS dataset - altitude out of range:', alt);
+                    return;
+                }
 
-            // Validate coordinate ranges (basic sanity check)
-            if (lat < -90 || lat > 90) {
-                console.log('Skipping invalid GPS data - latitude out of range:', lat);
-                return;
-            }
-            
-            if (lon < -180 || lon > 180) {
-                console.log('Skipping invalid GPS data - longitude out of range:', lon);
-                return;
-            }
-            
-            // Altitude validation: reasonable range for civilian GPS
-            // Dead Sea: -1,412 ft, Mount Everest: ~29,000 ft, plus margin for aircraft
-            if (alt < -2000 || alt > 50000) {
-                console.log('Skipping invalid GPS data - altitude out of range:', alt);
-                return;
-            }
-            
-            // Additional altitude sanity checks
-            if (!isFinite(alt)) {
-                console.log('Skipping invalid GPS data - altitude not finite:', alt);
-                return;
-            }
+                // All validation passed - hide any previous error messages
+                hideError();
 
-            // Hide error message if parsing succeeds
-            hideError();
+                const location = {
+                    latitude: lat,
+                    longitude: lon,
+                    altitude: alt,
+                    timestamp: new Date()
+                };
 
-            const location = {
-                latitude: lat,
-                longitude: lon,
-                altitude: alt,
-                timestamp: new Date()
-            };
-
-            updateGPSDisplay(location);
-            updateMap(location);
+                updateGPSDisplay(location);
+                updateMap(location);
+                
+            } catch (error) {
+                // Any parsing error discards the entire dataset
+                console.log('Discarding GPS data - parsing error:', error.message, 'Data:', data);
+                return;
+            }
         }
 
         // Update GPS display
