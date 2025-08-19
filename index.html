@@ -514,8 +514,8 @@
             
             // Add to history
             locationHistory.push(latlng);
-            if (locationHistory.length > 100) {
-                locationHistory.shift(); // Keep only last 100 points
+            if (locationHistory.length > 600) {
+                locationHistory.shift(); // Keep only last 600 points
             }
 
             // Update or create marker with smaller icon
