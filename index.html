@@ -208,8 +208,103 @@
         const TX_CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
         
         let txCharacteristic = null;
+        let phoneMarker = null;
+        let watchId = null;
+        let isIOS = false;
 
-        // Initialize map
+        // Check if running on iOS
+        function checkIOS() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            const platform = navigator.platform.toLowerCase();
+            
+            isIOS = /ipad|iphone|ipod/.test(userAgent) || 
+                   (platform === 'macintel' && navigator.maxTouchPoints > 1);
+            
+            console.log('iOS detected:', isIOS);
+            return isIOS;
+        }
+
+        // Start phone GPS tracking (iOS only)
+        function startPhoneGPS() {
+            if (!isIOS) return;
+            
+            if (!navigator.geolocation) {
+                console.log('Geolocation not supported');
+                return;
+            }
+
+            console.log('Starting phone GPS tracking...');
+            
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 1000
+            };
+
+            watchId = navigator.geolocation.watchPosition(
+                updatePhoneLocation,
+                handlePhoneGPSError,
+                options
+            );
+        }
+
+        // Update phone location on map
+        function updatePhoneLocation(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const alt = position.coords.altitude || 0;
+            const accuracy = position.coords.accuracy;
+            
+            console.log('Phone GPS update:', { lat, lon, alt, accuracy });
+            
+            const latlng = [lat, lon];
+            
+            // Remove existing phone marker
+            if (phoneMarker) {
+                map.removeLayer(phoneMarker);
+            }
+            
+            // Create red marker for phone location
+            const phoneIcon = L.divIcon({
+                html: '<div style="background: #ff3b30; border: 2px solid white; border-radius: 50%; width: 12px; height: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+                className: 'phone-marker',
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+            
+            phoneMarker = L.marker(latlng, { icon: phoneIcon })
+                .addTo(map)
+                .bindPopup(`📱 Phone GPS<br>Accuracy: ${accuracy.toFixed(0)}m<br>Alt: ${alt ? alt.toFixed(1) + 'm' : 'N/A'}`);
+        }
+
+        // Handle phone GPS errors
+        function handlePhoneGPSError(error) {
+            console.log('Phone GPS error:', error.message);
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    console.log('GPS permission denied');
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    console.log('GPS position unavailable');
+                    break;
+                case error.TIMEOUT:
+                    console.log('GPS timeout');
+                    break;
+            }
+        }
+
+        // Stop phone GPS tracking
+        function stopPhoneGPS() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            if (phoneMarker) {
+                map.removeLayer(phoneMarker);
+                phoneMarker = null;
+            }
+        }
         function initMap() {
             map = L.map('map').setView([37.7749, -122.4194], 13);
             
@@ -597,6 +692,12 @@
         window.addEventListener('load', () => {
             initMap();
             
+            // Check for iOS and start phone GPS if available
+            if (checkIOS()) {
+                console.log('iOS detected - starting phone GPS tracking');
+                startPhoneGPS();
+            }
+            
             // Set up message input event listeners
             const messageInput = document.getElementById('messageInput');
             
@@ -617,7 +718,7 @@
                 ua.includes('Safari') ? 'Safari' : 'Other';
             
             document.getElementById('iosVersion').textContent = 
-                ua.match(/OS (\d+_\d+)/)?.[1]?.replace('_', '.') || 'Unknown';
+                ua.match(/OS (\d+_\d+)/)?.[1]?.replace('_', '.') || (isIOS ? 'iOS Device' : 'Unknown');
             
             document.getElementById('protocolInfo').textContent = location.protocol;
             
