@@ -172,7 +172,8 @@
             </div>
             
             <div id="waitingMessage" class="waiting-message">
-                Connect to your Adafruit Bluefruit LE to start tracking
+                Connect to your Adafruit Bluefruit LE to start tracking<br>
+                <small style="color: #666; font-size: 12px;">Expected JSON format: {"lat":37.7749,"lon":-122.4194,"alt":150.5}</small>
             </div>
             
             <div id="debugInfo" style="font-size: 11px; color: #666; margin-top: 8px; display: none;">
@@ -510,42 +511,32 @@
             debugEl.style.display = 'block';
         }
 
-        // Parse GPS coordinates
-        function parseGPSData(data) {
+        // Parse GPS coordinates from JSON
+        function parseGPSData(jsonString) {
             try {
-                // Clean the data: remove all whitespace, newlines, carriage returns
-                const cleanData = data.replace(/[\r\n\t\s]*,[\r\n\t\s]*/g, ',').replace(/[\r\n\t]/g, '').trim();
+                console.log('Parsing JSON GPS data:', jsonString);
                 
-                const parts = cleanData.split(',');
+                // Parse JSON
+                const gpsData = JSON.parse(jsonString);
                 
-                // Validate we have exactly 3 parts
-                if (parts.length !== 3) {
-                    console.log('Discarding GPS data - wrong number of parts (expected 3, got ' + parts.length + '):', data);
-                    return;
-                }
-
-                // Parse all three values - any failure discards the entire dataset
-                const latStr = parts[0].trim();
-                const lonStr = parts[1].trim();
-                const altStr = parts[2].trim();
+                // Extract coordinates
+                const lat = gpsData.lat || gpsData.latitude;
+                const lon = gpsData.lon || gpsData.longitude || gpsData.lng;
+                const alt = gpsData.alt || gpsData.altitude || 0;
                 
-                // Check for empty parts
-                if (!latStr || !lonStr || !altStr) {
-                    console.log('Discarding GPS data - empty values:', { latStr, lonStr, altStr });
+                // Check if required fields exist
+                if (lat === undefined || lon === undefined) {
+                    console.log('Discarding GPS data - missing required fields (lat/lon):', gpsData);
                     return;
                 }
                 
-                const lat = parseFloat(latStr);
-                const lon = parseFloat(lonStr);
-                const alt = parseFloat(altStr);
-                
-                // Validate ALL values are valid finite numbers - any failure discards entire dataset
+                // Validate all values are valid finite numbers
                 if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(alt)) {
-                    console.log('Discarding entire GPS dataset - invalid numbers:', { lat, lon, alt, original: data });
+                    console.log('Discarding entire GPS dataset - invalid numbers:', { lat, lon, alt });
                     return;
                 }
                 
-                // Validate coordinate ranges - any failure discards entire dataset
+                // Validate coordinate ranges
                 if (lat < -90 || lat > 90) {
                     console.log('Discarding entire GPS dataset - latitude out of range:', lat);
                     return;
@@ -556,14 +547,13 @@
                     return;
                 }
                 
-                // Altitude validation - any failure discards entire dataset
-                // Dead Sea: -1,412 ft, Mount Everest: ~29,000 ft, plus margin for aircraft
+                // Altitude validation
                 if (alt < -2000 || alt > 50000) {
                     console.log('Discarding entire GPS dataset - altitude out of range:', alt);
                     return;
                 }
 
-                // All validation passed - hide any previous error messages
+                // All validation passed
                 hideError();
 
                 const location = {
@@ -577,8 +567,8 @@
                 updateMap(location);
                 
             } catch (error) {
-                // Any parsing error discards the entire dataset
-                console.log('Discarding GPS data - parsing error:', error.message, 'Data:', data);
+                // JSON parsing error - discard the entire dataset
+                console.log('Discarding GPS data - JSON parsing error:', error.message, 'Data:', jsonString);
                 return;
             }
         }
