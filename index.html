@@ -363,20 +363,25 @@
                 
                 // Get RX characteristic (for receiving data from device)
                 characteristic = await service.getCharacteristic(RX_CHARACTERISTIC_UUID);
-                console.log('RX Characteristic obtained:', characteristic);
+                console.log('RX Characteristic obtained');
                 
-                // Get TX characteristic (for sending data to device)
+                // Get TX characteristic (for sending data to device)  
                 txCharacteristic = await service.getCharacteristic(TX_CHARACTERISTIC_UUID);
-                console.log('TX Characteristic obtained:', txCharacteristic);
+                console.log('TX Characteristic obtained');
+                
+                // IMPORTANT: Remove any existing event listeners
+                if (characteristic.oncharacteristicvaluechanged) {
+                    characteristic.oncharacteristicvaluechanged = null;
+                }
                 
                 // Start notifications
-                console.log('Starting notifications on RX characteristic...');
+                console.log('Starting notifications...');
                 await characteristic.startNotifications();
                 console.log('Notifications started successfully');
                 
-                // Add single event listener for GPS data
-                characteristic.addEventListener('characteristicvaluechanged', handleGPSData);
-                console.log('Event listener added for characteristicvaluechanged');
+                // Add ONLY the new event listener
+                characteristic.oncharacteristicvaluechanged = handleGPSData;
+                console.log('NEW event listener attached');
 
                 // Clear buffer on new connection
                 dataBuffer = '';
