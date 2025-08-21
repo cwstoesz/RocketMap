@@ -140,6 +140,57 @@
                 margin-left: auto;
             }
         }
+
+        /* iOS Safari zoom prevention and viewport fixes */
+        input, select, textarea {
+            font-size: 16px !important;
+            -webkit-appearance: none;
+            border-radius: 0;
+        }
+        
+        /* Prevent zoom when focusing inputs on mobile */
+        @media screen and (max-width: 768px) {
+            input:focus {
+                font-size: 16px !important;
+                transform: translateZ(0);
+            }
+            
+            /* Ensure send button stays visible when keyboard appears */
+            .message-row {
+                position: relative;
+                z-index: 100;
+                background: white;
+                padding: 4px 0;
+            }
+            
+            /* Make sure the send button doesn't get cut off */
+            #sendBtn {
+                flex-shrink: 0;
+                min-width: 60px;
+            }
+        }
+
+        /* Additional iOS keyboard handling */
+        @supports (-webkit-touch-callout: none) {
+            /* iOS specific styles */
+            .container {
+                height: 100vh;
+                height: -webkit-fill-available;
+            }
+            
+            /* Prevent viewport changes when keyboard appears */
+            body {
+                position: fixed;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+            }
+            
+            .container {
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
     </style>
 </head>
 <body>
@@ -158,11 +209,11 @@
             </div>
             
             <div id="messagePanel" class="gps-info" style="display: none;">
-                <div style="display: flex; gap: 8px; align-items: center;">
+                <div class="message-row" style="display: flex; gap: 8px; align-items: center;">
                     <input type="text" id="messageInput" placeholder="Type message to send..." 
-                           maxlength="64" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                           maxlength="64" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px;">
                     <button id="sendBtn" onclick="sendMessage()" 
-                            style="background: #007aff; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 500; cursor: pointer;">
+                            style="background: #007aff; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 500; cursor: pointer; flex-shrink: 0; min-width: 60px;">
                         Send
                     </button>
                 </div>
@@ -732,6 +783,53 @@
                     sendMessage();
                 }
             });
+
+            // iOS keyboard handling
+            if (isIOS) {
+                // Prevent zoom on input focus
+                messageInput.addEventListener('touchstart', (e) => {
+                    // Set font size to prevent zoom
+                    messageInput.style.fontSize = '16px';
+                });
+                
+                // Handle keyboard show/hide events
+                let initialViewportHeight = window.innerHeight;
+                
+                messageInput.addEventListener('focus', () => {
+                    // Scroll the input into view after a short delay
+                    setTimeout(() => {
+                        messageInput.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'center' 
+                        });
+                    }, 300);
+                });
+                
+                messageInput.addEventListener('blur', () => {
+                    // Reset viewport when keyboard hides
+                    window.scrollTo(0, 0);
+                });
+                
+                // Listen for viewport changes (keyboard show/hide)
+                window.addEventListener('resize', () => {
+                    const currentHeight = window.innerHeight;
+                    const heightDifference = initialViewportHeight - currentHeight;
+                    
+                    // If viewport shrunk significantly (keyboard appeared)
+                    if (heightDifference > 150) {
+                        // Ensure message input is visible
+                        setTimeout(() => {
+                            const messagePanel = document.getElementById('messagePanel');
+                            if (messagePanel && document.activeElement === messageInput) {
+                                messagePanel.scrollIntoView({ 
+                                    behavior: 'smooth', 
+                                    block: 'end' 
+                                });
+                            }
+                        }, 100);
+                    }
+                });
+            }
             
             // Show debug info
             const ua = navigator.userAgent;
