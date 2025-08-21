@@ -153,7 +153,7 @@
             
             <div id="gpsDisplay" class="gps-info" style="display: none;">
                 <div class="coord-row" id="coordinates">📍 Waiting for GPS...</div>
-                <div class="alt-row" id="altitude">🔺 --</div>
+                <div class="alt-row" id="altitude">📶 --</div>
                 <div class="time-row" id="timestamp">--</div>
             </div>
             
@@ -172,8 +172,7 @@
             </div>
             
             <div id="waitingMessage" class="waiting-message">
-                Connect to your Adafruit Bluefruit LE to start tracking<br>
-                <small style="color: #666; font-size: 12px;">Expected JSON format: {"lat":37.7749,"lon":-122.4194,"alt":150.5}</small>
+                Connect to your Adafruit Bluefruit LE to start tracking
             </div>
             
             <div id="debugInfo" style="font-size: 11px; color: #666; margin-top: 8px; display: none;">
@@ -183,9 +182,7 @@
                 <div>Bluetooth API: <span id="bluetoothAPI"></span></div>
             </div>
             
-            <div id="debugData" style="background: #f0f0f0; border: 1px solid #ccc; padding: 8px; margin-top: 8px; font-size: 11px; font-family: monospace;">
-                Debug output will appear here...
-            </div>
+            <div id="debugData" style="display: none;"></div>
             
             <div id="errorMessage" class="error-message" style="display: none;"></div>
         </div>
@@ -308,6 +305,7 @@
                 phoneMarker = null;
             }
         }
+        
         function initMap() {
             map = L.map('map').setView([37.7749, -122.4194], 13);
             
@@ -363,25 +361,13 @@
                 
                 // Get RX characteristic (for receiving data from device)
                 characteristic = await service.getCharacteristic(RX_CHARACTERISTIC_UUID);
-                console.log('RX Characteristic obtained');
                 
-                // Get TX characteristic (for sending data to device)  
+                // Get TX characteristic (for sending data to device)
                 txCharacteristic = await service.getCharacteristic(TX_CHARACTERISTIC_UUID);
-                console.log('TX Characteristic obtained');
-                
-                // IMPORTANT: Remove any existing event listeners
-                if (characteristic.oncharacteristicvaluechanged) {
-                    characteristic.oncharacteristicvaluechanged = null;
-                }
                 
                 // Start notifications
-                console.log('Starting notifications...');
                 await characteristic.startNotifications();
-                console.log('Notifications started successfully');
-                
-                // Add ONLY the new event listener
-                characteristic.oncharacteristicvaluechanged = handleGPSData;
-                console.log('NEW event listener attached');
+                characteristic.addEventListener('characteristicvaluechanged', handleGPSData);
 
                 // Clear buffer on new connection
                 dataBuffer = '';
@@ -467,6 +453,7 @@
             charCount.textContent = length;
             charCount.style.color = length > 64 ? '#ff3b30' : length > 50 ? '#ff9500' : '#666';
         }
+
         function handleGPSData(event) {
             const decoder = new TextDecoder();
             const data = decoder.decode(event.target.value);
@@ -477,28 +464,47 @@
             dataBuffer += data;
             console.log('Current buffer length:', dataBuffer.length);
             
-            // Look for GPS coordinate patterns (lat, lon, alt format)
-            // Pattern: number, space, number, space, number followed by next number
-            const gpsPattern = /(-?\d+\.\d+),\s*(-?\d+\.\d+),\s*(\d+(?:\.\d+)?)(?=\d|$)/g;
-            
-            let match;
+            // Look for complete JSON objects in the buffer
             let processedLength = 0;
+            let startPos = 0;
             
-            // Find all complete GPS coordinate sets in the buffer
-            while ((match = gpsPattern.exec(dataBuffer)) !== null) {
-                const fullMatch = match[0];
-                const lat = match[1];
-                const lon = match[2];
-                const alt = match[3];
+            // Find all complete JSON objects
+            while (true) {
+                // Look for opening brace
+                const openBrace = dataBuffer.indexOf('{', startPos);
+                if (openBrace === -1) break;
                 
-                console.log('Found GPS coordinates:', { lat, lon, alt });
+                // Look for closing brace after the opening brace
+                let braceCount = 0;
+                let closeBrace = -1;
                 
-                // Create GPS string and process it
-                const gpsString = `${lat}, ${lon}, ${alt}`;
-                parseGPSData(gpsString);
+                for (let i = openBrace; i < dataBuffer.length; i++) {
+                    if (dataBuffer[i] === '{') {
+                        braceCount++;
+                    } else if (dataBuffer[i] === '}') {
+                        braceCount--;
+                        if (braceCount === 0) {
+                            closeBrace = i;
+                            break;
+                        }
+                    }
+                }
                 
-                // Track how much we've processed
-                processedLength = match.index + fullMatch.length;
+                // If we found a complete JSON object
+                if (closeBrace !== -1) {
+                    const jsonString = dataBuffer.substring(openBrace, closeBrace + 1);
+                    console.log('Found complete JSON:', jsonString);
+                    
+                    // Try to parse and process the JSON
+                    parseGPSData(jsonString);
+                    
+                    // Track how much we've processed
+                    processedLength = closeBrace + 1;
+                    startPos = processedLength;
+                } else {
+                    // No complete JSON found, stop looking
+                    break;
+                }
             }
             
             // Remove processed data from buffer, keep any incomplete data at the end
@@ -519,55 +525,65 @@
             const debugEl = document.getElementById('debugData');
             const trimmed = data.trim();
             debugEl.innerHTML = `
-                <div><strong>Processing GPS:</strong> "${trimmed}"</div>
+                <div><strong>Processing JSON:</strong> "${trimmed}"</div>
                 <div><strong>Buffer size:</strong> ${dataBuffer.length} chars</div>
             `;
             debugEl.style.display = 'block';
         }
 
-        // Parse GPS coordinates from JSON
-        function parseGPSData(jsonString) {
+        // Parse GPS JSON data
+        function parseGPSData(data) {
             try {
-                console.log('Parsing JSON GPS data:', jsonString);
+                // Clean the data: remove any surrounding whitespace or line breaks
+                const cleanData = data.trim();
                 
-                // Parse JSON
-                const gpsData = JSON.parse(jsonString);
+                console.log('Attempting to parse JSON:', cleanData);
                 
-                // Extract coordinates
-                const lat = gpsData.lat || gpsData.latitude;
-                const lon = gpsData.lon || gpsData.longitude || gpsData.lng;
-                const alt = gpsData.alt || gpsData.altitude || 0;
+                // Parse the JSON
+                const gpsData = JSON.parse(cleanData);
                 
-                // Check if required fields exist
-                if (lat === undefined || lon === undefined) {
-                    console.log('Discarding GPS data - missing required fields (lat/lon):', gpsData);
+                console.log('Parsed GPS data:', gpsData);
+                
+                // Validate required fields exist
+                if (!gpsData.hasOwnProperty('lat') || !gpsData.hasOwnProperty('lon') || !gpsData.hasOwnProperty('alt')) {
+                    console.log('Discarding GPS data - missing required fields (lat, lon, alt):', gpsData);
+                    showError('Invalid GPS data: missing required fields');
                     return;
                 }
                 
-                // Validate all values are valid finite numbers
+                // Extract values
+                const lat = gpsData.lat;
+                const lon = gpsData.lon;
+                const alt = gpsData.alt;
+                
+                // Validate ALL values are valid finite numbers
                 if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(alt)) {
-                    console.log('Discarding entire GPS dataset - invalid numbers:', { lat, lon, alt });
+                    console.log('Discarding GPS data - invalid numbers:', { lat, lon, alt });
+                    showError('Invalid GPS data: non-numeric values');
                     return;
                 }
                 
                 // Validate coordinate ranges
                 if (lat < -90 || lat > 90) {
-                    console.log('Discarding entire GPS dataset - latitude out of range:', lat);
+                    console.log('Discarding GPS data - latitude out of range:', lat);
+                    showError(`Invalid latitude: ${lat} (must be -90 to 90)`);
                     return;
                 }
                 
                 if (lon < -180 || lon > 180) {
-                    console.log('Discarding entire GPS dataset - longitude out of range:', lon);
+                    console.log('Discarding GPS data - longitude out of range:', lon);
+                    showError(`Invalid longitude: ${lon} (must be -180 to 180)`);
                     return;
                 }
                 
-                // Altitude validation
+                // Altitude validation - reasonable range for GPS tracking
                 if (alt < -2000 || alt > 50000) {
-                    console.log('Discarding entire GPS dataset - altitude out of range:', alt);
+                    console.log('Discarding GPS data - altitude out of range:', alt);
+                    showError(`Invalid altitude: ${alt} (must be -2000 to 50000)`);
                     return;
                 }
 
-                // All validation passed
+                // All validation passed - hide any previous error messages
                 hideError();
 
                 const location = {
@@ -577,12 +593,14 @@
                     timestamp: new Date()
                 };
 
+                console.log('Valid GPS location:', location);
                 updateGPSDisplay(location);
                 updateMap(location);
                 
             } catch (error) {
-                // JSON parsing error - discard the entire dataset
-                console.log('Discarding GPS data - JSON parsing error:', error.message, 'Data:', jsonString);
+                // JSON parsing error - discard the data
+                console.log('Discarding GPS data - JSON parsing error:', error.message, 'Data:', data);
+                showError(`JSON parsing error: ${error.message}`);
                 return;
             }
         }
@@ -593,7 +611,7 @@
                 `📍 ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
             
             document.getElementById('altitude').textContent = 
-                `🔺 ${location.altitude.toFixed(1)}FT`;
+                `📶 ${location.altitude.toFixed(1)}FT`;
             
             document.getElementById('timestamp').textContent = 
                 `Updated: ${location.timestamp.toLocaleTimeString()}`;
