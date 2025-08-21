@@ -374,15 +374,9 @@
                 await characteristic.startNotifications();
                 console.log('Notifications started successfully');
                 
+                // Add single event listener for GPS data
                 characteristic.addEventListener('characteristicvaluechanged', handleGPSData);
                 console.log('Event listener added for characteristicvaluechanged');
-                
-                // Test if we're getting any notifications at all
-                characteristic.addEventListener('characteristicvaluechanged', (event) => {
-                    console.log('*** NOTIFICATION RECEIVED ***');
-                    console.log('Event:', event);
-                    console.log('Value:', event.target.value);
-                });
 
                 // Clear buffer on new connection
                 dataBuffer = '';
