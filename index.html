@@ -305,8 +305,9 @@
             const lon = position.coords.longitude;
             const alt = position.coords.altitude || 0;
             const accuracy = position.coords.accuracy;
+            const heading = position.coords.heading; // Device heading in degrees
             
-            console.log('Phone GPS update:', { lat, lon, alt, accuracy });
+            console.log('Phone GPS update:', { lat, lon, alt, accuracy, heading });
             
             const latlng = [lat, lon];
             
@@ -315,17 +316,53 @@
                 map.removeLayer(phoneMarker);
             }
             
-            // Create red marker for phone location
+            // Create red marker with directional pointer for phone location
+            let markerHtml;
+            if (heading !== null && heading !== undefined) {
+                // Create marker with rotated pointer
+                markerHtml = `
+                    <div style="position: relative; width: 20px; height: 20px;">
+                        <div style="
+                            background: #ff3b30; 
+                            border: 2px solid white; 
+                            border-radius: 50%; 
+                            width: 16px; 
+                            height: 16px; 
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                            position: absolute;
+                            top: 2px;
+                            left: 2px;
+                        "></div>
+                        <div style="
+                            position: absolute;
+                            top: -2px;
+                            left: 50%;
+                            transform: translateX(-50%) rotate(${heading}deg);
+                            transform-origin: center bottom;
+                            width: 0;
+                            height: 0;
+                            border-left: 4px solid transparent;
+                            border-right: 4px solid transparent;
+                            border-bottom: 12px solid #ff3b30;
+                            z-index: 10;
+                        "></div>
+                    </div>
+                `;
+            } else {
+                // Fallback to simple dot if no heading available
+                markerHtml = '<div style="background: #ff3b30; border: 2px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>';
+            }
+            
             const phoneIcon = L.divIcon({
-                html: '<div style="background: #ff3b30; border: 2px solid white; border-radius: 50%; width: 12px; height: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+                html: markerHtml,
                 className: 'phone-marker',
-                iconSize: [12, 12],
-                iconAnchor: [6, 6]
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
             });
             
             phoneMarker = L.marker(latlng, { icon: phoneIcon })
                 .addTo(map)
-                .bindPopup(`📱 Phone GPS<br>Accuracy: ${accuracy.toFixed(0)}m<br>Alt: ${alt ? alt.toFixed(1) + 'm' : 'N/A'}`);
+                .bindPopup(`📱 Phone GPS<br>Accuracy: ${accuracy.toFixed(0)}m<br>Alt: ${alt ? alt.toFixed(1) + 'm' : 'N/A'}${heading !== null && heading !== undefined ? '<br>Heading: ' + heading.toFixed(0) + '°' : ''}`);
         }
 
         // Handle phone GPS errors
