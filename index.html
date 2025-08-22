@@ -515,6 +515,16 @@
             dataBuffer += data;
             console.log('Current buffer length:', dataBuffer.length);
             
+            // Check for "No Signal" message first
+            if (dataBuffer.includes('No Signal')) {
+                console.log('No Signal message detected');
+                displayNoSignal();
+                
+                // Remove the "No Signal" text from buffer
+                dataBuffer = dataBuffer.replace(/No Signal/g, '');
+                console.log('Buffer after removing No Signal:', JSON.stringify(dataBuffer));
+            }
+            
             // Look for complete JSON objects in the buffer
             let processedLength = 0;
             let startPos = 0;
@@ -571,15 +581,36 @@
             }
         }
         
-        // Show debug data on screen
-        function showDebugData(data) {
-            const debugEl = document.getElementById('debugData');
-            const trimmed = data.trim();
-            debugEl.innerHTML = `
-                <div><strong>Processing JSON:</strong> "${trimmed}"</div>
-                <div><strong>Buffer size:</strong> ${dataBuffer.length} chars</div>
-            `;
-            debugEl.style.display = 'block';
+        // Display "No Signal" status
+        function displayNoSignal() {
+            console.log('Displaying No Signal status');
+            
+            // Update GPS display to show no signal
+            document.getElementById('coordinates').textContent = '📍 No Signal';
+            document.getElementById('coordinates').style.color = '#ff9500'; // Orange color
+            
+            document.getElementById('altitude').textContent = '📶 --';
+            document.getElementById('altitude').style.color = '#ff9500';
+            
+            document.getElementById('timestamp').textContent = 
+                `No Signal: ${new Date().toLocaleTimeString()}`;
+            document.getElementById('timestamp').style.color = '#ff9500';
+            
+            // Hide any previous errors since this is expected
+            hideError();
+            
+            // Optional: You could add a visual indicator on the map too
+            // For example, change the marker color or add a "No Signal" popup
+            if (currentMarker) {
+                currentMarker.bindPopup('📡 GPS Signal Lost').openPopup();
+            }
+        }
+
+        // Reset display colors when valid GPS data is received
+        function resetDisplayColors() {
+            document.getElementById('coordinates').style.color = '#1d1d1f';
+            document.getElementById('altitude').style.color = '#8e8e93';
+            document.getElementById('timestamp').style.color = '#8e8e93';
         }
 
         // Parse GPS JSON data
@@ -636,6 +667,9 @@
 
                 // All validation passed - hide any previous error messages
                 hideError();
+                
+                // Reset display colors to normal (in case we were showing "No Signal")
+                resetDisplayColors();
 
                 const location = {
                     latitude: lat,
@@ -654,6 +688,17 @@
                 showError(`JSON parsing error: ${error.message}`);
                 return;
             }
+        }
+
+        // Show debug data on screen
+        function showDebugData(data) {
+            const debugEl = document.getElementById('debugData');
+            const trimmed = data.trim();
+            debugEl.innerHTML = `
+                <div><strong>Processing JSON:</strong> "${trimmed}"</div>
+                <div><strong>Buffer size:</strong> ${dataBuffer.length} chars</div>
+            `;
+            debugEl.style.display = 'block';
         }
 
         // Update GPS display
