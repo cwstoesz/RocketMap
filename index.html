@@ -220,6 +220,10 @@
                 <div style="font-size: 11px; color: #666; margin-top: 4px;">
                     <span id="charCount">0</span>/64 characters
                 </div>
+                <button id="orientationBtn" onclick="requestOrientationPermission()" 
+                        style="background: #ff9500; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px; display: none;">
+                    Enable Compass
+                </button>
             </div>
             
             <div id="waitingMessage" class="waiting-message">
@@ -308,6 +312,13 @@
             // Alpha: 0-360 degrees, where 0 is north (top of phone)
             let alpha = event.alpha;
             
+            console.log('Device orientation event:', {
+                alpha: alpha,
+                beta: event.beta,
+                gamma: event.gamma,
+                absolute: event.absolute
+            });
+            
             if (alpha !== null && alpha !== undefined) {
                 // Convert to match our coordinate system where 0° points to top of phone (north)
                 deviceOrientation = alpha;
@@ -320,6 +331,8 @@
                     // Trigger an update by simulating a position update
                     updatePhoneLocationOrientation(currentPos.lat, currentPos.lng);
                 }
+            } else {
+                console.log('Alpha value is null or undefined');
             }
         }
 
@@ -909,6 +922,39 @@
             return true;
         }
 
+        // Request device orientation permission (iOS 13+)
+        async function requestOrientationPermission() {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                console.log('Requesting device orientation permission...');
+                try {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    console.log('Device orientation permission:', permission);
+                    
+                    if (permission === 'granted') {
+                        window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+                        console.log('Device orientation listener added');
+                        document.getElementById('orientationBtn').style.display = 'none';
+                        hideError();
+                        return true;
+                    } else {
+                        console.log('Device orientation permission denied');
+                        showError('Device orientation permission denied. Pointer will not rotate.');
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('Error requesting device orientation permission:', error);
+                    showError('Could not request device orientation permission');
+                    return false;
+                }
+            } else {
+                // Older iOS versions or other browsers
+                console.log('No permission required for device orientation');
+                window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+                document.getElementById('orientationBtn').style.display = 'none';
+                return true;
+            }
+        }
+
         // Initialize app
         window.addEventListener('load', () => {
             initMap();
@@ -921,7 +967,13 @@
                 // Set up device orientation listener for iOS
                 if (window.DeviceOrientationEvent) {
                     console.log('Device orientation supported');
-                    window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+                    // For iOS 13+, show button to request permission
+                    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        document.getElementById('orientationBtn').style.display = 'inline-block';
+                    } else {
+                        // Older iOS versions, try to set up directly
+                        requestOrientationPermission();
+                    }
                 } else {
                     console.log('Device orientation not supported');
                 }
