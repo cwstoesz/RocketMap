@@ -320,9 +320,10 @@
             });
             
             if (alpha !== null && alpha !== undefined) {
-                // Convert to match our coordinate system where 0° points to top of phone (north)
-                deviceOrientation = alpha;
-                console.log('Device orientation updated:', deviceOrientation);
+                // Add 180 degrees to correct the pointer direction
+                // This makes the pointer point in the correct direction relative to device orientation
+                deviceOrientation = (alpha + 180) % 360;
+                console.log('Device orientation updated:', deviceOrientation, '(raw alpha:', alpha, ')');
                 
                 // Update the marker if it exists and we have a current position
                 if (phoneMarker && map) {
